@@ -1,0 +1,493 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Pingski",
+    "version": "0.1.0",
+    "description": "Lightweight macOS notification daemon. POST a JSON payload and Pingski shows a native macOS notification with an optional image, deep link, sound, grouping and action buttons. Click, action and dismiss events are exposed via polling, server-sent events and webhooks.\n\nMost request fields accept aliases (for example `message`/`body`/`text`, `icon`/`logo`/`image`, `url`/`link`/`deep_link`). Generated clients should use the canonical names shown here.",
+    "license": { "name": "MIT", "url": "https://opensource.org/licenses/MIT" },
+    "contact": { "name": "Pingski", "url": "https://github.com/lookevink/pingski" }
+  },
+  "servers": [
+    { "url": "http://127.0.0.1:7464", "description": "Local daemon (default port)" },
+    {
+      "url": "http://{host}:{port}",
+      "description": "Custom host/port",
+      "variables": {
+        "host": { "default": "127.0.0.1" },
+        "port": { "default": "7464" }
+      }
+    }
+  ],
+  "tags": [
+    { "name": "notifications", "description": "Send, list and remove notifications" },
+    { "name": "events", "description": "Click, action and dismiss events" },
+    { "name": "system", "description": "Health, permissions and documentation" }
+  ],
+  "security": [ { "bearerAuth": [] }, { "apiKeyAuth": [] }, {} ],
+  "paths": {
+    "/": {
+      "get": {
+        "tags": ["system"],
+        "operationId": "getIndex",
+        "summary": "Service index",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Links to docs, spec and health",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Index" } } }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": ["system"],
+        "operationId": "getHealth",
+        "summary": "Health and notification permission status",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Daemon is running",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Health" } } }
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "tags": ["system"],
+        "operationId": "getOpenAPI",
+        "summary": "This OpenAPI document",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OpenAPI 3.0 document",
+            "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } }
+          }
+        }
+      }
+    },
+    "/docs": {
+      "get": {
+        "tags": ["system"],
+        "operationId": "getDocs",
+        "summary": "Interactive API reference (HTML)",
+        "security": [],
+        "responses": {
+          "200": { "description": "HTML page", "content": { "text/html": { "schema": { "type": "string" } } } }
+        }
+      }
+    },
+    "/authorize": {
+      "post": {
+        "tags": ["system"],
+        "operationId": "requestAuthorization",
+        "summary": "Trigger the macOS notification permission prompt",
+        "description": "Asks macOS for permission to show notifications. The prompt only appears the first time; afterwards the user must change it in System Settings > Notifications > Pingski.",
+        "responses": {
+          "200": {
+            "description": "Current permission state",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Authorization" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/notify": {
+      "post": {
+        "tags": ["notifications"],
+        "operationId": "sendNotification",
+        "summary": "Send a notification",
+        "description": "Shows a native macOS notification. Returns `201` when it was handed to Notification Center immediately or `202` when `delay` scheduled it for later. Re-using an `id` replaces the existing notification.",
+        "requestBody": { "$ref": "#/components/requestBodies/Notification" },
+        "responses": {
+          "201": { "$ref": "#/components/responses/Delivered" },
+          "202": { "$ref": "#/components/responses/Scheduled" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/NotAuthorized" },
+          "413": { "$ref": "#/components/responses/TooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMedia" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/notifications": {
+      "post": {
+        "tags": ["notifications"],
+        "operationId": "createNotification",
+        "summary": "Send a notification (REST alias of /notify)",
+        "requestBody": { "$ref": "#/components/requestBodies/Notification" },
+        "responses": {
+          "201": { "$ref": "#/components/responses/Delivered" },
+          "202": { "$ref": "#/components/responses/Scheduled" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/NotAuthorized" },
+          "413": { "$ref": "#/components/responses/TooLarge" },
+          "415": { "$ref": "#/components/responses/UnsupportedMedia" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      },
+      "get": {
+        "tags": ["notifications"],
+        "operationId": "listNotifications",
+        "summary": "List pending (scheduled) and delivered notifications",
+        "responses": {
+          "200": {
+            "description": "Notifications currently known to Notification Center",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NotificationList" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "delete": {
+        "tags": ["notifications"],
+        "operationId": "clearNotifications",
+        "summary": "Remove all pending and delivered notifications",
+        "responses": {
+          "200": {
+            "description": "Everything was removed",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DeleteResult" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/notifications/{id}": {
+      "parameters": [ { "$ref": "#/components/parameters/NotificationId" } ],
+      "get": {
+        "tags": ["notifications"],
+        "operationId": "getNotification",
+        "summary": "Get one pending or delivered notification",
+        "responses": {
+          "200": {
+            "description": "The notification",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NotificationInfo" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "delete": {
+        "tags": ["notifications"],
+        "operationId": "deleteNotification",
+        "summary": "Remove a notification",
+        "description": "Cancels a scheduled notification or removes a delivered one from Notification Center.",
+        "responses": {
+          "200": {
+            "description": "Removed",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DeleteResult" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": {
+            "description": "No such notification",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DeleteResult" } } }
+          }
+        }
+      }
+    },
+    "/events": {
+      "get": {
+        "tags": ["events"],
+        "operationId": "listEvents",
+        "summary": "Recent notification events",
+        "description": "Returns up to the last 1000 events (delivered, clicked, action, dismissed, removed) in memory. Use `since` with the `seq` of the last event you saw to poll incrementally.",
+        "parameters": [
+          { "name": "since", "in": "query", "description": "Only return events with `seq` greater than this value", "schema": { "type": "integer", "minimum": 0 } },
+          { "name": "limit", "in": "query", "description": "Maximum number of events to return", "schema": { "type": "integer", "minimum": 1, "maximum": 1000, "default": 100 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Events in ascending `seq` order",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EventList" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/events/stream": {
+      "get": {
+        "tags": ["events"],
+        "operationId": "streamEvents",
+        "summary": "Server-sent event stream of notification events",
+        "description": "Long-lived `text/event-stream` response. Each frame has `id` (= `seq`), `event` (= event type) and a JSON `data` payload matching the `Event` schema. Send `Last-Event-ID` (or `?since=`) to replay events you missed. A comment heartbeat is sent every 15 seconds.",
+        "parameters": [
+          { "name": "since", "in": "query", "description": "Replay events with `seq` greater than this value before streaming live ones", "schema": { "type": "integer", "minimum": 0 } },
+          { "name": "Last-Event-ID", "in": "header", "description": "Same as `since`, as sent automatically by EventSource clients on reconnect", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE stream",
+            "content": { "text/event-stream": { "schema": { "type": "string", "example": "id: 12\nevent: clicked\ndata: {\"seq\":12,\"type\":\"clicked\",\"notificationId\":\"...\"}\n\n" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "description": "Required only when the daemon was started with `--token`." },
+      "apiKeyAuth": { "type": "apiKey", "in": "header", "name": "X-API-Key", "description": "Alternative to the bearer token." }
+    },
+    "parameters": {
+      "NotificationId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "Notification identifier (the `id` returned when it was sent)",
+        "schema": { "type": "string" }
+      }
+    },
+    "requestBodies": {
+      "Notification": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/NotificationRequest" },
+            "examples": {
+              "minimal": { "summary": "Title only", "value": { "title": "Deploy finished" } },
+              "full": {
+                "summary": "All features",
+                "value": {
+                  "id": "deploy-42",
+                  "title": "Deploy finished",
+                  "subtitle": "production",
+                  "message": "v2.3.1 is live on 12 hosts",
+                  "icon": "https://example.com/logo.png",
+                  "url": "https://dash.example.com/deploys/42",
+                  "sound": "Glass",
+                  "group": "deploys",
+                  "priority": "timeSensitive",
+                  "actions": [
+                    { "id": "logs", "title": "View logs", "url": "https://dash.example.com/deploys/42/logs" },
+                    { "id": "rollback", "title": "Roll back", "destructive": true },
+                    { "id": "note", "title": "Add note", "textInput": { "buttonTitle": "Save", "placeholder": "What happened?" } }
+                  ],
+                  "callbackUrl": "https://hooks.example.com/pingski",
+                  "data": { "deployId": 42, "env": "prod" }
+                }
+              },
+              "scheduled": { "summary": "Deliver in 10 minutes", "value": { "title": "Stand-up", "message": "Starts in 5 minutes", "delay": 600 } }
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "Delivered": {
+        "description": "Notification handed to Notification Center",
+        "headers": { "Location": { "description": "URL of the created notification", "schema": { "type": "string" } } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NotificationReceipt" } } }
+      },
+      "Scheduled": {
+        "description": "Notification scheduled for later delivery",
+        "headers": { "Location": { "description": "URL of the scheduled notification", "schema": { "type": "string" } } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NotificationReceipt" } } }
+      },
+      "BadRequest": {
+        "description": "Invalid JSON or failed validation",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Unauthorized": {
+        "description": "Token required or invalid",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "NotAuthorized": {
+        "description": "macOS notification permission denied for Pingski",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "NotFound": {
+        "description": "Not found",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "TooLarge": {
+        "description": "Body larger than 16 MiB",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "UnsupportedMedia": {
+        "description": "Content-Type is not JSON",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "ServerError": {
+        "description": "Notification Center rejected the request",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    },
+    "schemas": {
+      "NotificationRequest": {
+        "type": "object",
+        "required": ["title"],
+        "properties": {
+          "id": { "type": "string", "description": "Stable identifier. Sending again with the same id replaces the notification. Generated (UUID) when omitted.", "example": "deploy-42" },
+          "title": { "type": "string", "description": "Header line. Aliases: `header`, `heading`.", "example": "Deploy finished" },
+          "subtitle": { "type": "string", "description": "Second line shown under the title.", "example": "production" },
+          "message": { "type": "string", "description": "Body text. Aliases: `body`, `text`.", "example": "v2.3.1 is live" },
+          "icon": { "type": "string", "description": "Image shown with the notification (logo). Accepts an http(s) URL, an absolute file path, a `file://` URL or a `data:image/...;base64,...` URI. PNG, JPEG, GIF, HEIC and WebP up to 10 MiB. Aliases: `logo`, `image`.", "example": "https://example.com/logo.png" },
+          "url": { "type": "string", "format": "uri", "description": "Deep link opened with the default handler when the notification is clicked. Any scheme works (`https://`, `slack://`, `vscode://`, `x-apple.systempreferences:`...). Aliases: `link`, `deep_link`, `deepLink`.", "example": "https://dash.example.com/deploys/42" },
+          "sound": { "type": "string", "description": "`default` (the default), `none` for silent, `critical`, or the name of a sound in /System/Library/Sounds, ~/Library/Sounds or /Library/Sounds (e.g. `Glass`, `Ping`, `Submarine`).", "example": "Glass" },
+          "group": { "type": "string", "description": "Thread identifier. Notifications with the same group are stacked together in Notification Center. Aliases: `thread`, `threadIdentifier`.", "example": "deploys" },
+          "badge": { "type": "integer", "minimum": 0, "description": "Number to show on the Pingski Dock badge. 0 clears it." },
+          "priority": { "$ref": "#/components/schemas/Priority" },
+          "relevance": { "type": "number", "minimum": 0, "maximum": 1, "description": "Relevance score used by Notification Summary ordering." },
+          "delay": { "type": "number", "minimum": 0, "maximum": 31536000, "description": "Seconds to wait before delivering. When > 0 the response is `202` with `status: scheduled`.", "example": 60 },
+          "actions": {
+            "type": "array",
+            "maxItems": 10,
+            "description": "Buttons shown when the user expands the notification (hover and click the arrow, or long-press). Each tap produces an `action` event.",
+            "items": { "$ref": "#/components/schemas/Action" }
+          },
+          "callbackUrl": { "type": "string", "format": "uri", "description": "Webhook that receives this notification's events as JSON POSTs (in addition to the daemon-wide `--webhook`). Aliases: `callback_url`, `callback`, `webhook`.", "example": "https://hooks.example.com/pingski" },
+          "data": { "description": "Arbitrary JSON echoed back in every event for this notification.", "nullable": true, "example": { "deployId": 42 } }
+        }
+      },
+      "Priority": {
+        "type": "string",
+        "description": "macOS interruption level. `passive` does not light up the screen or play sound, `active` is normal, `timeSensitive` breaks through Focus (needs the user to allow it for Pingski), `critical` plays sound while muted (requires an Apple entitlement; falls back to active without it).",
+        "enum": ["passive", "active", "timeSensitive", "critical"],
+        "default": "active"
+      },
+      "Action": {
+        "type": "object",
+        "required": ["title"],
+        "properties": {
+          "id": { "type": "string", "description": "Identifier reported in the `action` event. Defaults to a slug of the title.", "example": "logs" },
+          "title": { "type": "string", "description": "Button label", "example": "View logs" },
+          "url": { "type": "string", "format": "uri", "description": "Deep link opened when this button is pressed." },
+          "destructive": { "type": "boolean", "description": "Render the button in red.", "default": false },
+          "foreground": { "type": "boolean", "description": "Bring the app to the foreground when pressed.", "default": false },
+          "authenticationRequired": { "type": "boolean", "description": "Require the device to be unlocked before the action runs.", "default": false },
+          "textInput": {
+            "type": "object",
+            "description": "When present the button opens a text field; the entered text is delivered in the event's `text` field.",
+            "properties": {
+              "buttonTitle": { "type": "string", "default": "Send" },
+              "placeholder": { "type": "string" }
+            }
+          }
+        }
+      },
+      "NotificationReceipt": {
+        "type": "object",
+        "required": ["id", "status", "createdAt"],
+        "properties": {
+          "id": { "type": "string" },
+          "status": { "type": "string", "enum": ["delivered", "scheduled"] },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "deliverAt": { "type": "string", "format": "date-time", "nullable": true, "description": "Set when `status` is `scheduled`." }
+        }
+      },
+      "NotificationInfo": {
+        "type": "object",
+        "required": ["id", "state", "title"],
+        "properties": {
+          "id": { "type": "string" },
+          "state": { "type": "string", "enum": ["pending", "delivered"] },
+          "title": { "type": "string" },
+          "subtitle": { "type": "string", "nullable": true },
+          "message": { "type": "string", "nullable": true },
+          "url": { "type": "string", "nullable": true },
+          "group": { "type": "string", "nullable": true },
+          "date": { "type": "string", "format": "date-time", "nullable": true, "description": "Delivery date for delivered notifications, next trigger date for pending ones." },
+          "data": { "nullable": true }
+        }
+      },
+      "NotificationList": {
+        "type": "object",
+        "required": ["notifications", "count"],
+        "properties": {
+          "notifications": { "type": "array", "items": { "$ref": "#/components/schemas/NotificationInfo" } },
+          "count": { "type": "integer" }
+        }
+      },
+      "DeleteResult": {
+        "type": "object",
+        "required": ["removed"],
+        "properties": {
+          "removed": { "type": "boolean" },
+          "id": { "type": "string", "nullable": true }
+        }
+      },
+      "EventType": {
+        "type": "string",
+        "enum": ["delivered", "clicked", "action", "dismissed", "removed"],
+        "description": "`delivered`: handed to Notification Center. `clicked`: the user clicked the notification body (its `url` was opened). `action`: a button was pressed (`actionId`, optional `text`). `dismissed`: the user closed it. `removed`: removed through the API."
+      },
+      "Event": {
+        "type": "object",
+        "required": ["seq", "type", "notificationId", "timestamp"],
+        "properties": {
+          "seq": { "type": "integer", "description": "Monotonic sequence number, usable as `since` / `Last-Event-ID`." },
+          "type": { "$ref": "#/components/schemas/EventType" },
+          "notificationId": { "type": "string" },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "title": { "type": "string", "nullable": true },
+          "actionId": { "type": "string", "nullable": true, "description": "Set for `action` events." },
+          "text": { "type": "string", "nullable": true, "description": "Text entered for a `textInput` action." },
+          "url": { "type": "string", "nullable": true, "description": "Deep link that was opened, if any." },
+          "data": { "nullable": true, "description": "The `data` payload the notification was sent with." }
+        }
+      },
+      "EventList": {
+        "type": "object",
+        "required": ["events", "latestSeq"],
+        "properties": {
+          "events": { "type": "array", "items": { "$ref": "#/components/schemas/Event" } },
+          "latestSeq": { "type": "integer", "description": "Sequence number of the newest event known to the daemon." }
+        }
+      },
+      "Health": {
+        "type": "object",
+        "required": ["status", "version", "uptimeSeconds", "authorization", "macOSVersion", "port"],
+        "properties": {
+          "status": { "type": "string", "example": "ok" },
+          "version": { "type": "string", "example": "0.1.0" },
+          "uptimeSeconds": { "type": "integer" },
+          "authorization": { "$ref": "#/components/schemas/AuthorizationStatus" },
+          "bundleIdentifier": { "type": "string", "nullable": true, "example": "com.pingski.daemon" },
+          "macOSVersion": { "type": "string", "example": "Version 15.1 (Build 24B83)" },
+          "port": { "type": "integer", "example": 7464 }
+        }
+      },
+      "AuthorizationStatus": {
+        "type": "string",
+        "enum": ["authorized", "denied", "notDetermined", "provisional", "ephemeral", "unknown"],
+        "description": "macOS notification permission for Pingski."
+      },
+      "Authorization": {
+        "type": "object",
+        "required": ["authorization", "granted"],
+        "properties": {
+          "authorization": { "$ref": "#/components/schemas/AuthorizationStatus" },
+          "granted": { "type": "boolean" }
+        }
+      },
+      "Index": {
+        "type": "object",
+        "required": ["name", "version", "docs", "openapi", "health"],
+        "properties": {
+          "name": { "type": "string", "example": "pingski" },
+          "version": { "type": "string" },
+          "docs": { "type": "string", "example": "/docs" },
+          "openapi": { "type": "string", "example": "/openapi.json" },
+          "health": { "type": "string", "example": "/health" }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["code", "message"],
+            "properties": {
+              "code": { "type": "string", "example": "validation_error" },
+              "message": { "type": "string", "example": "missing required field 'title'" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: swift --version
+      - name: Unit tests
+        run: make test
+      - name: Build app bundle
+        run: make build
+      - name: Smoke-test binary
+        run: |
+          ./build/Pingski.app/Contents/MacOS/pingski --version
+          ./build/Pingski.app/Contents/MacOS/pingski openapi | python3 -I -c 'import json,sys; json.load(sys.stdin)'
+      - name: Embedded OpenAPI spec is up to date
+        run: |
+          scripts/embed-openapi.sh
+          git diff --exit-code -- Sources/pingski/OpenAPISpec.swift
+
+  formula:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: brew style
+        run: brew style Formula/pingski.rb

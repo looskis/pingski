@@ -1,0 +1,109 @@
+name: Release
+
+# Triggered by pushing a tag such as v0.1.0 (scripts/release.sh does this).
+# Builds universal (arm64 + x86_64) archives, runs the tests, publishes a GitHub release with the
+# archives, SHA256SUMS and a formula carrying the real sha256, and pushes that formula to
+# lookevink/homebrew-tap using the TAP_DEPLOY_KEY secret (a write deploy key for the tap).
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    env:
+      TAG: ${{ github.ref_name }}
+      TAP_DEPLOY_KEY: ${{ secrets.TAP_DEPLOY_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check tag matches Version.swift
+        run: |
+          version="$(sed -n 's/.*pingskiVersion = "\(.*\)".*/\1/p' Sources/pingski/Version.swift)"
+          if [ "v$version" != "$TAG" ]; then
+            echo "tag $TAG does not match Version.swift ($version)"; exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Unit tests
+        run: make test
+
+      - name: Build universal archives
+        run: |
+          make dist
+          lipo -archs build/Pingski.app/Contents/MacOS/pingski
+          tar -C build/dist -xzf "build/dist/pingski-$VERSION-macos-universal.tar.gz"
+          "build/dist/pingski-$VERSION-macos-universal/bin/pingski" --version | grep -q "$VERSION"
+          rm -rf "build/dist/pingski-$VERSION-macos-universal"
+
+      - name: Formula with release sha256
+        run: |
+          sha="$(shasum -a 256 "build/dist/pingski-$VERSION-macos-universal.tar.gz" | cut -d' ' -f1)"
+          sed -i '' \
+            -e "s|/releases/download/v[0-9.]*/pingski-[0-9.]*-macos-universal.tar.gz|/releases/download/$TAG/pingski-$VERSION-macos-universal.tar.gz|" \
+            -e "s|^  sha256 \".*\"|  sha256 \"$sha\"|" Formula/pingski.rb
+          brew style Formula/pingski.rb
+          cp Formula/pingski.rb build/dist/pingski.rb
+          {
+            echo "## Homebrew formula"
+            echo
+            echo "Tarball sha256: \`$sha\`"
+            echo
+            echo '```ruby'; cat Formula/pingski.rb; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Release notes
+        run: |
+          # Section of CHANGELOG.md for this version, or a generic line if there is none.
+          awk -v v="$VERSION" '
+            /^## / { if (found) exit; found = ($0 ~ "\\[" v "\\]" || $0 ~ "^## " v) ; next }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "Pingski $VERSION" > notes.md
+          cat >> notes.md <<MD
+
+          ## Install
+
+          Homebrew (prebuilt universal binary):
+
+          \`\`\`sh
+          brew install lookevink/tap/pingski
+          \`\`\`
+
+          Manual: download \`pingski-$VERSION-macos-universal.tar.gz\`, extract it anywhere and run
+          \`bin/pingski\`, or drop \`Pingski.app\` from the zip into /Applications. Archives downloaded with
+          a browser carry the quarantine flag; clear it with \`xattr -dr com.apple.quarantine <path>\`.
+          Verify downloads against \`SHA256SUMS\`.
+          MD
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" \
+            --title "Pingski $VERSION" \
+            --notes-file notes.md \
+            "build/dist/pingski-$VERSION-macos-universal.tar.gz" \
+            "build/dist/Pingski-$VERSION.zip" \
+            build/dist/SHA256SUMS \
+            build/dist/pingski.rb
+
+      - name: Push formula to lookevink/homebrew-tap
+        if: env.TAP_DEPLOY_KEY != ''
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$TAP_DEPLOY_KEY" > ~/.ssh/tap_deploy_key
+          chmod 600 ~/.ssh/tap_deploy_key
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/tap_deploy_key -o IdentitiesOnly=yes"
+          git clone git@github.com:lookevink/homebrew-tap.git tap
+          cp Formula/pingski.rb tap/Formula/pingski.rb
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/pingski.rb
+          git commit -m "pingski $VERSION" || exit 0
+          git push
