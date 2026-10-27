@@ -2,8 +2,10 @@ name: Release
 
 # Triggered by pushing a tag such as v0.1.0 (scripts/release.sh does this).
 # Builds universal (arm64 + x86_64) archives, runs the tests, publishes a GitHub release with the
-# archives, SHA256SUMS and a formula carrying the real sha256, and pushes that formula to
-# lookevink/homebrew-tap using the TAP_DEPLOY_KEY secret (a write deploy key for the tap).
+# archives, SHA256SUMS and a formula carrying the real sha256, then publishes the formula to
+# lookevink/homebrew-tap: the TAP_DEPLOY_KEY secret (a write deploy key for the tap) pushes a
+# pingski-<version> branch, and TAP_GITHUB_TOKEN (optional fine-grained PAT with Contents and
+# Pull requests write access to the tap) opens and merges the pull request into its protected main.
 on:
   push:
     tags: ["v*"]
@@ -17,6 +19,8 @@ jobs:
     env:
       TAG: ${{ github.ref_name }}
       TAP_DEPLOY_KEY: ${{ secrets.TAP_DEPLOY_KEY }}
+      TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+      TAP_REPO: lookevink/homebrew-tap
     steps:
       - uses: actions/checkout@v4
 
@@ -79,31 +83,58 @@ jobs:
           Verify downloads against \`SHA256SUMS\`.
           MD
 
-      - name: Create GitHub release
+      - name: Create or update GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$TAG" \
-            --title "Pingski $VERSION" \
-            --notes-file notes.md \
-            "build/dist/pingski-$VERSION-macos-universal.tar.gz" \
-            "build/dist/Pingski-$VERSION.zip" \
-            build/dist/SHA256SUMS \
-            build/dist/pingski.rb
+          assets="build/dist/pingski-$VERSION-macos-universal.tar.gz build/dist/Pingski-$VERSION.zip
+                  build/dist/SHA256SUMS build/dist/pingski.rb"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # Re-run on an existing tag: replace the assets and notes in place.
+            gh release upload "$TAG" --clobber $assets
+            gh release edit "$TAG" --title "Pingski $VERSION" --notes-file notes.md
+          else
+            gh release create "$TAG" --title "Pingski $VERSION" --notes-file notes.md $assets
+          fi
 
-      - name: Push formula to lookevink/homebrew-tap
+      - name: Push formula branch to the tap
         if: env.TAP_DEPLOY_KEY != ''
         run: |
           mkdir -p ~/.ssh
           printf '%s\n' "$TAP_DEPLOY_KEY" > ~/.ssh/tap_deploy_key
           chmod 600 ~/.ssh/tap_deploy_key
-          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
-          export GIT_SSH_COMMAND="ssh -i ~/.ssh/tap_deploy_key -o IdentitiesOnly=yes"
-          git clone git@github.com:lookevink/homebrew-tap.git tap
+          ssh-keyscan -t ed25519 github.com > ~/.ssh/tap_known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -F /dev/null -i ~/.ssh/tap_deploy_key -o IdentitiesOnly=yes -o UserKnownHostsFile=~/.ssh/tap_known_hosts"
+          git clone "git@github.com:$TAP_REPO.git" tap
           cp Formula/pingski.rb tap/Formula/pingski.rb
           cd tap
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "pingski-$VERSION"
           git add Formula/pingski.rb
-          git commit -m "pingski $VERSION" || exit 0
-          git push
+          if git diff --cached --quiet; then
+            echo "formula already up to date in $TAP_REPO"
+            echo "TAP_BRANCH=" >> "$GITHUB_ENV"
+          else
+            git commit -m "pingski $VERSION"
+            git push --force -u origin "pingski-$VERSION"
+            echo "TAP_BRANCH=pingski-$VERSION" >> "$GITHUB_ENV"
+          fi
+
+      - name: Open and merge the tap pull request
+        if: env.TAP_BRANCH != ''
+        run: |
+          body="Updates the Pingski formula to $VERSION (https://github.com/${{ github.repository }}/releases/tag/$TAG)."
+          if [ -n "$TAP_GITHUB_TOKEN" ]; then
+            export GH_TOKEN="$TAP_GITHUB_TOKEN"
+            pr="$(gh pr list --repo "$TAP_REPO" --head "$TAP_BRANCH" --json url --jq '.[0].url')"
+            if [ -z "$pr" ]; then
+              pr="$(gh pr create --repo "$TAP_REPO" --head "$TAP_BRANCH" --base main \
+                      --title "pingski $VERSION" --body "$body")"
+            fi
+            gh pr merge "$pr" --repo "$TAP_REPO" --squash --delete-branch
+            echo "merged $pr" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            url="https://github.com/$TAP_REPO/compare/main...$TAP_BRANCH?expand=1&title=pingski%20$VERSION"
+            echo "TAP_GITHUB_TOKEN is not set; open the pull request by hand: $url" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi

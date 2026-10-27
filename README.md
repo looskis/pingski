@@ -180,10 +180,12 @@ Formula/pingski.rb        Homebrew formula
    runs the tests, commits, tags `vx.y.z` and pushes.
 3. The `Release` GitHub Actions workflow builds and tests on a macOS runner, attaches the universal
    `pingski-x.y.z-macos-universal.tar.gz`, `Pingski-x.y.z.zip`, `SHA256SUMS` and `pingski.rb` (with
-   the real `sha256`) to the GitHub release,
-   and pushes the formula to `lookevink/homebrew-tap` using the `TAP_DEPLOY_KEY` repository secret
-   (a deploy key with write access to the tap).
-4. Without that secret, publish the formula by hand: `scripts/update-tap.sh x.y.z`.
+   the real `sha256`) to the GitHub release, then pushes a `pingski-x.y.z` branch to
+   `lookevink/homebrew-tap` with the `TAP_DEPLOY_KEY` secret (a write deploy key for the tap).
+4. The tap's `main` is protected, so the formula lands through a pull request. With the optional
+   `TAP_GITHUB_TOKEN` secret (a fine-grained PAT with Contents and Pull requests write access to the
+   tap) the workflow opens and merges it; otherwise open it from the link in the workflow summary.
+5. Fallback without CI: `scripts/update-tap.sh x.y.z` writes the sha256 and pushes a tap branch.
 
 ## Limitations
 
