@@ -11,7 +11,7 @@ version="${1:-}"
 tap_dir="${2:-${TAP_DIR:-../homebrew-tap}}"
 tag="v$version"
 asset="pingski-$version-macos-universal.tar.gz"
-url="https://github.com/lookevink/pingski/releases/download/$tag/$asset"
+url="https://github.com/looskis/pingski/releases/download/$tag/$asset"
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT

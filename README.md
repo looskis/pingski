@@ -45,7 +45,7 @@ PINGSKI_WEBHOOK=https://hooks.example.com/pingski
 
 ### Prebuilt archive
 
-Every [release](https://github.com/lookevink/pingski/releases) ships a universal (Apple silicon + Intel)
+Every [release](https://github.com/looskis/pingski/releases) ships a universal (Apple silicon + Intel)
 `pingski-x.y.z-macos-universal.tar.gz` containing `Pingski.app` and a `bin/pingski` launcher, plus a
 `Pingski-x.y.z.zip` with just the app, and `SHA256SUMS`. Extract the tarball anywhere and put `bin` on
 your `PATH`. Archives downloaded with a browser carry the quarantine flag; clear it with
