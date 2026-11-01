@@ -3,6 +3,17 @@
 All notable changes to Pingski are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow semver.
 
+## [0.1.1] - 2026-11-01
+
+### Removed
+
+- The formula's post-install LaunchServices step. Homebrew never ran it and its sandbox would block it;
+  the daemon already registers its bundle at startup.
+
+### Changed
+
+- The formula moved to the shared Looskis tap: `brew install looskis/tap/pingski`.
+
 ## [0.1.0] - 2026-10-27
 
 ### Added

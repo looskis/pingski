@@ -27,15 +27,15 @@ curl -X POST localhost:7464/notify -H 'Content-Type: application/json' -d '{
 ### Homebrew
 
 ```sh
-brew install lookevink/tap/pingski      # from https://github.com/lookevink/homebrew-tap
+brew install looskis/tap/pingski      # from https://github.com/looskis/homebrew-tap
 brew services start pingski             # optional: run as a LaunchAgent
 
 # or build the latest main from this repo:
 brew install --HEAD ./Formula/pingski.rb
 ```
 
-The formula builds from source with the Swift toolchain, assembles `Pingski.app`, ad-hoc signs it and
-installs a `pingski` launcher in `bin`. Settings for the service go in `$(brew --prefix)/etc/pingski.env`:
+The formula installs the prebuilt universal (arm64 + x86_64), ad-hoc signed `Pingski.app` and a
+`pingski` launcher in `bin`; `--HEAD` builds from source with the Swift toolchain instead. Settings for the service go in `$(brew --prefix)/etc/pingski.env`:
 
 ```sh
 PINGSKI_PORT=8080
@@ -180,12 +180,12 @@ Formula/pingski.rb        Homebrew formula
    runs the tests, commits, tags `vx.y.z` and pushes.
 3. The `Release` GitHub Actions workflow builds and tests on a macOS runner, attaches the universal
    `pingski-x.y.z-macos-universal.tar.gz`, `Pingski-x.y.z.zip`, `SHA256SUMS` and `pingski.rb` (with
-   the real `sha256`) to the GitHub release, then pushes a `pingski-x.y.z` branch to
-   `lookevink/homebrew-tap` with the `TAP_DEPLOY_KEY` secret (a write deploy key for the tap).
-4. The tap's `main` is protected, so the formula lands through a pull request. With the optional
-   `TAP_GITHUB_TOKEN` secret (a fine-grained PAT with Contents and Pull requests write access to the
-   tap) the workflow opens and merges it; otherwise open it from the link in the workflow summary.
-5. Fallback without CI: `scripts/update-tap.sh x.y.z` writes the sha256 and pushes a tap branch.
+   the real `sha256`) to the GitHub release.
+4. The formula lands in `looskis/homebrew-tap` through a pull request (its `main` is protected). With
+   the optional `TAP_GITHUB_TOKEN` secret (a fine-grained PAT with Contents and Pull requests write
+   access to the tap) the workflow pushes the branch and merges the pull request. The looskis org
+   disables deploy keys, so without the token run `scripts/update-tap.sh x.y.z`, which writes the
+   sha256, pushes a `pingski-x.y.z` branch with your own credentials and opens the pull request.
 
 ## Limitations
 

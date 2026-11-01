@@ -1,6 +1,6 @@
 #!/bin/sh
 # Manual fallback for the Release workflow's tap step: downloads the release tarball, writes its
-# sha256 into Formula/pingski.rb, pushes a pingski-<version> branch to lookevink/homebrew-tap and
+# sha256 into Formula/pingski.rb, pushes a pingski-<version> branch to looskis/homebrew-tap and
 # opens the pull request (the tap's main branch is protected).
 #
 #   scripts/update-tap.sh 0.2.0 [path/to/homebrew-tap]
@@ -26,7 +26,7 @@ sed -i '' \
 brew style Formula/pingski.rb
 
 if [ ! -d "$tap_dir/.git" ]; then
-  git clone https://github.com/lookevink/homebrew-tap.git "$tap_dir"
+  git clone https://github.com/looskis/homebrew-tap.git "$tap_dir"
 fi
 mkdir -p "$tap_dir/Formula"
 cp Formula/pingski.rb "$tap_dir/Formula/pingski.rb"
@@ -44,4 +44,4 @@ cp Formula/pingski.rb "$tap_dir/Formula/pingski.rb"
 
 echo
 echo "Merge the pull request, then verify with:"
-echo "  brew update && brew install lookevink/tap/pingski && brew test pingski"
+echo "  brew update && brew install looskis/tap/pingski && brew test pingski"

@@ -20,13 +20,6 @@ class Pingski < Formula
     end
   end
 
-  def post_install_steps
-    # Register the bundle with LaunchServices so macOS can show the permission prompt and route clicks.
-    lsregister = "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework" \
-                 "/Support/lsregister"
-    system lsregister, "-f", prefix/"Pingski.app" if File.exist?(lsregister)
-  end
-
   def caveats
     <<~EOS
       The first time pingski delivers a notification macOS asks for permission.

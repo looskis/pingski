@@ -45,5 +45,5 @@ echo
 echo "Pushed $tag. The Release workflow is now building:"
 echo "  https://github.com/looskis/pingski/actions"
 echo "When it finishes the GitHub release carries the universal archives, SHA256SUMS and pingski.rb."
-echo "If the TAP_DEPLOY_KEY secret is not configured, publish the formula with:"
+echo "If the TAP_GITHUB_TOKEN secret is not configured, publish the formula with:"
 echo "  scripts/update-tap.sh $version"
