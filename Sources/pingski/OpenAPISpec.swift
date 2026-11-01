@@ -5,7 +5,7 @@ enum OpenAPISpec {
   "openapi": "3.0.3",
   "info": {
     "title": "Pingski",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "Lightweight macOS notification daemon. POST a JSON payload and Pingski shows a native macOS notification with an optional image, deep link, sound, grouping and action buttons. Click, action and dismiss events are exposed via polling, server-sent events and webhooks.\n\nMost request fields accept aliases (for example `message`/`body`/`text`, `icon`/`logo`/`image`, `url`/`link`/`deep_link`). Generated clients should use the canonical names shown here.",
     "license": { "name": "MIT", "url": "https://opensource.org/licenses/MIT" },
     "contact": { "name": "Pingski", "url": "https://github.com/looskis/pingski" }

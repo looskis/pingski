@@ -1,7 +1,7 @@
 class Pingski < Formula
   desc "Lightweight macOS notification daemon with an HTTP + OpenAPI interface"
   homepage "https://github.com/looskis/pingski"
-  url "https://github.com/looskis/pingski/releases/download/v0.1.0/pingski-0.1.0-macos-universal.tar.gz"
+  url "https://github.com/looskis/pingski/releases/download/v0.1.1/pingski-0.1.1-macos-universal.tar.gz"
   # Filled in by the Release workflow (sha256 of the universal tarball it builds).
   sha256 "0000000000000000000000000000000000000000000000000000000000000000"
   license "MIT"
